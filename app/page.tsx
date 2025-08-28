@@ -74,62 +74,41 @@ export default function InvestmentSimulator() {
   const calculateSimulation = async () => {
     setIsCalculating(true)
 
-    // Simulate calculation delay
-    await new Promise((resolve) => setTimeout(resolve, 1000))
-
-    const yearlyResults: SimulationResult[] = []
-    let currentBalance = principal
-    const rate = annualRate[0] / 100
-    const yearlyDeposit =
-      depositFrequency === "monthly" ? depositAmount * 12 : depositFrequency === "yearly" ? depositAmount : 0
-
-    for (let year = 1; year <= years[0]; year++) {
-      let yearlyInterest = 0
-      let yearlyTax = 0
-      let yearlyFee = 0
-
-      // Add yearly deposit
-      currentBalance += yearlyDeposit
-
-      // Calculate interest
-      if (interestType === "compound") {
-        yearlyInterest = currentBalance * rate
-      } else {
-        yearlyInterest = principal * rate
-      }
-
-      // Calculate management fee
-      yearlyFee = currentBalance * (managementFee / 100)
-
-      // Calculate tax
-      if (taxTiming === "annual") {
-        yearlyTax = yearlyInterest * (taxRate / 100)
-      }
-
-      // Update balance
-      currentBalance += yearlyInterest - yearlyTax - yearlyFee
-
-      yearlyResults.push({
-        year,
-        principal: year === 1 ? principal : yearlyResults[year - 2].principal + yearlyDeposit,
-        deposit: yearlyDeposit,
-        interest: yearlyInterest,
-        tax: yearlyTax,
-        fee: yearlyFee,
-        balance: currentBalance,
+    try {
+      const response = await fetch('/api/calculate-simulation', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          principal,
+          interestType,
+          annualRate: annualRate[0],
+          years: years[0],
+          depositAmount,
+          depositFrequency,
+          taxRate,
+          taxTiming,
+          managementFee,
+          tradingFee
+        })
       })
-    }
 
-    // Apply maturity tax if needed
-    if (taxTiming === "maturity") {
-      const totalInterest = yearlyResults.reduce((sum, result) => sum + result.interest, 0)
-      const maturityTax = totalInterest * (taxRate / 100)
-      yearlyResults[yearlyResults.length - 1].tax = maturityTax
-      yearlyResults[yearlyResults.length - 1].balance -= maturityTax
+      const result = await response.json()
+      
+      if (result.success) {
+        setResults(result.data)
+      } else {
+        // エラー表示
+        console.error('計算エラー:', result.error)
+        alert(result.error || '計算中にエラーが発生しました')
+      }
+    } catch (error) {
+      console.error('通信エラー:', error)
+      alert('サーバーとの通信に失敗しました。しばらく時間をおいて再度お試しください。')
+    } finally {
+      setIsCalculating(false)
     }
-
-    setResults(yearlyResults)
-    setIsCalculating(false)
   }
 
   const resetForm = () => {
